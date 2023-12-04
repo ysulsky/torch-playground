@@ -11,17 +11,20 @@ class MultiHeadLinear(nn.Module):
   """Applies multiple independent linear projections."""
 
   def __init__(
-      self, n_heads: int, in_features: int, out_features: int, axis: int):
+      self, n_heads: int, in_features: int, out_features: int, dim: int):
     super().__init__()
-    self.axis = axis
-    self.heads = nn.ModuleList([
-      nn.Linear(in_features, out_features, bias=False)
-      for _ in range(n_heads)
-    ])
+    self.n_heads = n_heads
+    self.out_features = out_features
+    self.dim = dim
+    self.linear = nn.Linear(in_features, out_features * n_heads, bias=False)
 
   def forward(self, x: Tensor) -> Tensor:
-    outs = [head(x) for head in self.heads]
-    return torch.stack(outs, dim=self.axis)
+    out = self.linear(x).view((*x.shape[:-1], self.n_heads, self.out_features))
+    dim = self.dim % out.ndim
+    out_dims = list(range(out.ndim))
+    del out_dims[-2]
+    out_dims.insert(dim, -2)
+    return out.permute(*out_dims)
 
 
 @dataclasses.dataclass

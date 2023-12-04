@@ -16,7 +16,7 @@ class MultiHeadLinearTest(unittest.TestCase):
     out_features = 5
     seq_len = 6
     net = model.MultiHeadLinear(n_heads=n_heads, in_features=in_features,
-                                out_features=out_features, axis=-3)
+                                out_features=out_features, dim=-3)
     input = torch.zeros((batch_size, seq_len, in_features))
     out = net(input)
     self.assertEqual(out.shape, (batch_size, n_heads, seq_len, out_features))
