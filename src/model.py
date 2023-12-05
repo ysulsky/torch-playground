@@ -98,7 +98,7 @@ class AttentionBlock(nn.Module):
       y_norm = self.attn_prenorm(y)
     Ty = y.shape[1] if cache is None else cache.seq_len
     assert B == y.shape[0] and D == y.shape[-1]
-    q = self.qfn(x_norm)  # [B, H, Tx, D//H]466,  0.2759, -0.6625],
+    q = self.qfn(x_norm)  # [B, H, Tx, D//H]
     k = self.kfn(y_norm)  # [B, H, Ty, D//H]
     v = self.vfn(y_norm)  # [B, H, Ty, D//H]
     if cache is not None:
