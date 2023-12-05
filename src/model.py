@@ -71,15 +71,15 @@ class AttentionBlock(nn.Module):
     if d_model % n_heads:
       raise ValueError(f"{d_model=} not divisibile by {n_heads=}")
     d_head = d_model // n_heads
-    self.attn_prenorm = lambda x:x #nn.LayerNorm(d_model)
-    self.ffw_prenorm = lambda x:x #nn.LayerNorm(d_model)
-    self.kfn = MultiHeadLinear(n_heads, d_model, d_head, axis=-3)
-    self.qfn = MultiHeadLinear(n_heads, d_model, d_head, axis=-3)
-    self.vfn = MultiHeadLinear(n_heads, d_model, d_head, axis=-3)
+    self.attn_prenorm = nn.LayerNorm(d_model)
+    self.ffw_prenorm = nn.LayerNorm(d_model)
+    self.kfn = MultiHeadLinear(n_heads, d_model, d_head, dim=-3)
+    self.qfn = MultiHeadLinear(n_heads, d_model, d_head, dim=-3)
+    self.vfn = MultiHeadLinear(n_heads, d_model, d_head, dim=-3)
     self.ffw = nn.Sequential(nn.Linear(d_model, d_model * 4),
                              nn.GELU(),
                              nn.Linear(d_model * 4, d_model))
-    self.dropout = lambda x: x#nn.Dropout(dropout)
+    self.dropout = nn.Dropout(dropout)
 
   @classmethod
   def causal_self_attention_mask(cls, seq_len: int) -> Tensor:
@@ -171,12 +171,20 @@ class Transformer(nn.Module):
       cache = out_cache
     return self.proj(x), cache
 
-  def loss(self, tokens: Tensor, target: Tensor) -> float:
+  def loss(self, tokens: Tensor, target: Tensor,
+           target_mask: Tensor | None = None) -> float:
     logits, _ = self(tokens, None)
     assert logits.shape == (*target.shape, self.vocab_size)
     logits = torch.reshape(logits, (-1, self.vocab_size))
     target = torch.reshape(target, (-1,))
-    return Categorical(logits=logits).log_prob(target).mean()
+    log_probs = Categorical(logits=logits).log_prob(target)
+    numel = log_probs.numel()
+    if target_mask is not None:
+      target_mask = torch.reshape(target_mask, (-1,))
+      log_probs = torch.where(target_mask, log_probs, 0.)
+      num_el = target_mask.sum()
+      num_el = torch.where(num_el > 0, num_el, 1)
+    return -log_probs.sum() / num_el
 
   def sample(self, prefix: Tensor) -> Tensor:
     batch_size, prefix_len = prefix.shape
